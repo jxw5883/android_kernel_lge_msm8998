@@ -970,11 +970,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 kill:
 #endif
 		task_lock(selected);
-#ifdef CONFIG_BOOST_DYING_TASK
-		//Improve the priority of killed process can accelerate the process to die,
-		//and the process memory would be released quickly
-		boost_dying_task_prio(selected);
-#endif
+		get_task_struct(selected);
 		send_sig(SIGKILL, selected, 0);
 		/*
 		 * FIXME: lowmemorykiller shouldn't abuse global OOM killer
@@ -1036,7 +1032,6 @@ kill:
 				reclaimed_cnt, reclaim_cnt, min_score_adj);
 #endif
 		rcu_read_unlock();
-		get_task_struct(selected);
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 		trace_almk_shrink(selected_tasksize, ret,
