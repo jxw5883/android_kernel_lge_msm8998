@@ -5758,14 +5758,6 @@ static int msm_tdm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 		break;
 	case AFE_PORT_ID_QUATERNARY_TDM_RX:
 		channels->min = channels->max =
-				tdm_rx_cfg[TDM_QUAT][TDM_0].channels;
-		param_set_mask(params, SNDRV_PCM_HW_PARAM_FORMAT,
-			       tdm_rx_cfg[TDM_QUAT][TDM_0].bit_format);
-		rate->min = rate->max =
-				tdm_rx_cfg[TDM_QUAT][TDM_0].sample_rate;
-		break;
-	case AFE_PORT_ID_QUATERNARY_TDM_RX_1:
-		channels->min = channels->max =
 				tdm_rx_cfg[TDM_QUAT][TDM_1].channels;
 		param_set_mask(params, SNDRV_PCM_HW_PARAM_FORMAT,
 				tdm_rx_cfg[TDM_QUAT][TDM_1].bit_format);
@@ -6154,7 +6146,6 @@ static int msm8998_tdm_snd_hw_params(struct snd_pcm_substream *substream,
 		slots = tdm_slot[TDM_TERT].num;
 		slot_width = tdm_slot[TDM_TERT].width;
 		slot_offset = tdm_tx_slot_offset[TDM_TERT][TDM_0];
-		break;
 	case AFE_PORT_ID_TERTIARY_TDM_TX_1:
 		slots = tdm_slot[TDM_TERT].num;
 		slot_width = tdm_slot[TDM_TERT].width;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2656,6 +2656,13 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("failed to update fps!\n");
+		goto commit_fail;
+	}
+
+	ret = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_DSI_DYNAMIC_BITCLK,
+		NULL, CTL_INTF_EVENT_FLAG_SKIP_BROADCAST);
+	if (IS_ERR_VALUE(ret)) {
+		pr_err("failed to update dynamic bit clk!\n");
 		goto commit_fail;
 	}
 
@@ -5792,12 +5799,14 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 
 panel_on:
 	if (mdp5_data->vsync_en) {
-		pr_info("reenabling vsync for fb%d\n", mfd->index);
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
-		rc = ctl->ops.add_vsync_handler(ctl, &ctl->vsync_handler);
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
+		if ((ctl) && (ctl->ops.add_vsync_handler)) {
+			pr_info("reenabling vsync for fb%d\n", mfd->index);
+			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
+			rc = ctl->ops.add_vsync_handler(ctl,
+					 &ctl->vsync_handler);
+			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
+		}
 	}
-
 	if (IS_ERR_VALUE(rc)) {
 		pr_err("Failed to turn on fb%d\n", mfd->index);
 		mdss_mdp_overlay_off(mfd);

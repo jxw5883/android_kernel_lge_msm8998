@@ -500,11 +500,12 @@ int sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(sock_queue_rcv_skb);
 
-int sk_receive_skb(struct sock *sk, struct sk_buff *skb, const int nested)
+int __sk_receive_skb(struct sock *sk, struct sk_buff *skb,
+		     const int nested, unsigned int trim_cap)
 {
 	int rc = NET_RX_SUCCESS;
 
-	if (sk_filter(sk, skb))
+	if (sk_filter_trim_cap(sk, skb, trim_cap))
 		goto discard_and_relse;
 
 	skb->dev = NULL;
@@ -540,7 +541,7 @@ discard_and_relse:
 	kfree_skb(skb);
 	goto out;
 }
-EXPORT_SYMBOL(sk_receive_skb);
+EXPORT_SYMBOL(__sk_receive_skb);
 
 struct dst_entry *__sk_dst_check(struct sock *sk, u32 cookie)
 {
@@ -748,6 +749,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 		break;
 	case SO_DONTROUTE:
 		sock_valbool_flag(sk, SOCK_LOCALROUTE, valbool);
+		sk_dst_reset(sk);
 		break;
 	case SO_BROADCAST:
 		sock_valbool_flag(sk, SOCK_BROADCAST, valbool);
@@ -2189,7 +2191,7 @@ int __sk_mem_schedule(struct sock *sk, int size, int kind)
 	}
 
 	if (sk_has_memory_pressure(sk)) {
-		int alloc;
+		u64 alloc;
 
 		if (!sk_under_memory_pressure(sk))
 			return 1;
@@ -2494,6 +2496,9 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_sndtimeo		=	MAX_SCHEDULE_TIMEOUT;
 
 	sk->sk_stamp = ktime_set(-1L, 0);
+#if BITS_PER_LONG==32
+	seqlock_init(&sk->sk_stamp_seq);
+#endif
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	sk->sk_napi_id		=	0;
