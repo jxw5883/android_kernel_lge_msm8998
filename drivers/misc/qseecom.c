@@ -446,7 +446,7 @@ static int __qseecom_scm_call2_locked(uint32_t smc_id, struct scm_desc *desc)
 	int retry_count = 0;
 
 	do {
-		ret = scm_call2(smc_id, desc);
+		ret = scm_call2_noretry(smc_id, desc);
 		if (ret == -EBUSY) {
 			mutex_unlock(&app_access_lock);
 			msleep(QSEECOM_SCM_EBUSY_WAIT_MS);
@@ -1848,7 +1848,6 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 			status = QSEOS_RESULT_FAILURE;
 			goto err_resp;
 		}
-
 		pr_debug("waking up rcv_req_wq and waiting for send_resp_wq\n");
 
 		/* initialize the new signal mask with all signals*/

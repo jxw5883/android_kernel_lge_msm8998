@@ -75,7 +75,7 @@ module_param(qmi_timeout, ulong, 0600);
 
 #define ICNSS_MAX_PROBE_CNT		2
 
-#define PROBE_TIMEOUT			15000
+#define PROBE_TIMEOUT			5000
 
 #define icnss_ipc_log_string(_x...) do {				\
 	if (icnss_ipc_log_context)					\
