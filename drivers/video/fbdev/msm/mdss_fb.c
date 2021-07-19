@@ -1,7 +1,7 @@
 /*
  * Core MDSS framebuffer driver.
  *
- * Copyright (c) 2008-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2008-2020, The Linux Foundation. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
  *
  * This software is licensed under the terms of the GNU General Public
@@ -691,7 +691,7 @@ static ssize_t mdss_fb_get_panel_info(struct device *dev,
 			"red_chromaticity_x=%d\nred_chromaticity_y=%d\n"
 			"green_chromaticity_x=%d\ngreen_chromaticity_y=%d\n"
 			"blue_chromaticity_x=%d\nblue_chromaticity_y=%d\n"
-			"panel_orientation=%d\n",
+			"panel_orientation=%d\ndyn_bitclk_en=%d\n",
 			pinfo->partial_update_enabled,
 			pinfo->roi_alignment.xstart_pix_align,
 			pinfo->roi_alignment.width_pix_align,
@@ -717,7 +717,7 @@ static ssize_t mdss_fb_get_panel_info(struct device *dev,
 			pinfo->hdr_properties.display_primaries[5],
 			pinfo->hdr_properties.display_primaries[6],
 			pinfo->hdr_properties.display_primaries[7],
-			pinfo->panel_orientation);
+			pinfo->panel_orientation, pinfo->dynamic_bitclk);
 
 	return ret;
 }
@@ -3755,7 +3755,7 @@ static int mdss_fb_pan_display(struct fb_var_screeninfo *var,
 	 * 2. When the splash handoff is pending.
 	 */
 	if ((mfd->switch_state != MDSS_MDP_NO_UPDATE_REQUESTED) ||
-			mdata->handoff_pending) {
+		(mdss_fb_is_hdmi_primary(mfd) && mdata->handoff_pending)) {
 		pr_debug("fb%d: pan_display skipped during switch or handoff\n",
 				mfd->index);
 		return 0;
@@ -4241,7 +4241,7 @@ static int mdss_fb_set_par(struct fb_info *info)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	struct fb_var_screeninfo *var = &info->var;
-	int old_imgType, old_format;
+	int old_imgType, old_format, out_format;
 	int ret = 0;
 
 	ret = mdss_fb_pan_idle(mfd);
@@ -4324,17 +4324,23 @@ static int mdss_fb_set_par(struct fb_info *info)
 		mfd->fbi->fix.smem_len = PAGE_ALIGN(mfd->fbi->fix.line_length *
 				mfd->fbi->var.yres) * mfd->fb_page;
 
-	old_format = mdss_grayscale_to_mdp_format(var->grayscale);
-	if (!IS_ERR_VALUE(old_format)) {
+	old_format = mfd->panel_info->out_format;
+	out_format = mdss_grayscale_to_mdp_format(var->grayscale);
+	if (!IS_ERR_VALUE(out_format)) {
+		mfd->panel_info->out_format = out_format;
 		if (old_format != mfd->panel_info->out_format)
 			mfd->panel_reconfig = true;
 	}
+
+	if (mdss_fb_is_hdmi_primary(mfd) && mfd->panel_reconfig)
+		mfd->force_null_commit = true;
 
 	if (mfd->panel_reconfig || (mfd->fb_imgType != old_imgType)) {
 		mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info, mfd->op_enable);
 		mdss_fb_var_to_panelinfo(var, mfd->panel_info);
 		mdss_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable);
 		mfd->panel_reconfig = false;
+		mfd->force_null_commit = false;
 	}
 
 	return ret;
@@ -4914,6 +4920,7 @@ static int mdss_fb_atomic_commit_ioctl(struct fb_info *info,
 	struct mdp_destination_scaler_data __user *ds_data_user;
 	struct msm_fb_data_type *mfd;
 	struct mdss_overlay_private *mdp5_data = NULL;
+	struct mdss_data_type *mdata;
 
 	ret = copy_from_user(&commit, argp, sizeof(struct mdp_layer_commit));
 	if (ret) {
@@ -5016,6 +5023,13 @@ static int mdss_fb_atomic_commit_ioctl(struct fb_info *info,
 	ds_data_user = commit.commit_v1.dest_scaler;
 	if ((ds_data_user) &&
 		(commit.commit_v1.dest_scaler_cnt)) {
+		mdata = mfd_to_mdata(mfd);
+		if (!mdata || !mdata->scaler_off ||
+				 !mdata->scaler_off->has_dest_scaler) {
+			pr_err("dest scaler not supported\n");
+			ret = -EPERM;
+			goto err;
+		}
 		ret = __mdss_fb_copy_destscaler_data(info, &commit);
 		if (ret) {
 			pr_err("copy dest scaler failed\n");
