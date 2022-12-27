@@ -1169,9 +1169,13 @@ trip_point_temp_store(struct device *dev, struct device_attribute *attr,
 	if (kstrtol(buf, 10, &temperature))
 		return -EINVAL;
 
-	ret = sensor_set_trip_temp(tz, trip, temperature);
+	ret = tz->ops->set_trip_temp(tz, trip, temperature);
+	if (ret)
+		return ret;
 
-	return ret ? ret : count;
+	thermal_zone_device_update(tz);
+
+	return count;
 }
 
 static ssize_t
